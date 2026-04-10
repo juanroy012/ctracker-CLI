@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 
@@ -16,8 +15,12 @@ var baseStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.NormalBorder()).
 	BorderForeground(lipgloss.Color("240"))
 
+var input string
+var err error
+
 type screen int
 
+// Enum equivalent pointing to screen
 const (
 	screenProjects screen = iota
 	screenCommits
@@ -134,21 +137,44 @@ func applyTableStyle(t *table.Model) {
 }
 
 func main() {
-	fmt.Print("> ")
-	scanner := bufio.NewScanner(os.Stdin)
-	input, err := getUserInput(scanner)
-	if err != nil {
-		log.Fatal(err)
+	if len(os.Args) > 1 {
+		input = os.Args[1]
+	} else {
+		scanner := bufio.NewScanner(os.Stdin)
+		for {
+			fmt.Print("> ")
+			s, err := getUserInput(scanner)
+			if err != nil {
+				fmt.Println("input error: ", err)
+				continue
+			}
+			if input == "q" {
+				return
+			}
+			info, err := os.Stat(s)
+			if err != nil {
+				fmt.Println("path not found: ", s)
+				continue
+			}
+			if !info.IsDir() {
+				fmt.Println("not a directory:", s)
+				continue
+			}
+			input = s
+			break
+		}
 	}
 	dir, err := scanGitDir(input)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "error scanning directory:", err)
+		os.Exit(1)
 	}
 	var projects []project
 	for _, d := range dir {
 		ds, err := initializeProject(d)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Fprintf(os.Stderr, "Skipping %s %v\n", d, err)
+			continue
 		}
 		projects = append(projects, ds)
 	}
@@ -186,7 +212,8 @@ func main() {
 		0,
 	}
 	if _, err := tea.NewProgram(m).Run(); err != nil {
-		fmt.Println("Error running program: ", err)
+		fmt.Fprintf(os.Stderr, "Error running program: ", err)
 		os.Exit(1)
 	}
+
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"io/fs"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -30,7 +31,15 @@ func initializeProject(folderPath string) (project, error) {
 }
 
 func extractProjectName(folderPath string) string {
-	return filepath.Base(folderPath)
+	n := filepath.Base(folderPath)
+	if n == ".git" || n == "." {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "unknown"
+		}
+		n = filepath.Base(wd)
+	}
+	return n
 }
 
 func separateCommits(output []byte) []string {
