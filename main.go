@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
+	"sync"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
@@ -142,7 +145,7 @@ func main() {
 	} else {
 		scanner := bufio.NewScanner(os.Stdin)
 		for {
-			fmt.Print("> ")
+			fmt.Print("Enter path: ")
 			s, err := getUserInput(scanner)
 			if err != nil {
 				fmt.Println("input error: ", err)
@@ -171,14 +174,22 @@ func main() {
 		os.Exit(1)
 	}
 	var projects []project
+	var wg sync.WaitGroup
+	ch := make(chan project)
 	for _, d := range dir {
-		ds, err := initializeProject(d)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Skipping %s %v\n", d, err)
-			continue
-		}
-		projects = append(projects, ds)
+		wg.Add(1)
+		go initializeProject(d, ch, &wg)
 	}
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+	for pr := range ch {
+		projects = append(projects, pr)
+	}
+	sort.Slice(projects, func(i, j int) bool {
+		return strings.ToLower(projects[i].name) < strings.ToLower(projects[j].name)
+	})
 	columns := []table.Column{
 		{Title: "No", Width: 5},
 		{Title: "Project", Width: 20},

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 type project struct {
@@ -16,19 +18,31 @@ type project struct {
 }
 
 // InitializeProject take project path and return a project object
-func initializeProject(folderPath string) (project, error) {
-	output, err := exec.Command("git", "-C", folderPath, "log", "--oneline").Output()
+func initializeProject(folderPath string, ch chan project, wg *sync.WaitGroup) {
+	defer wg.Done()
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("git", "-C", folderPath, "log", "--oneline")
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
 	if err != nil {
-		return project{}, err
+		msg := stderr.String()
+		if strings.Contains(strings.ToLower(msg), "does not have any commits yet") {
+			fmt.Printf("Directory %v doesn't have any commits yet\n", folderPath)
+		} else {
+			fmt.Printf("Skipping directory: %v likely not a repo or bad path\n", folderPath)
+		}
 	}
-	commit := separateCommits(output)
-	name := extractProjectName(folderPath)
 
-	return project{
+	name := extractProjectName(folderPath)
+	commit := separateCommits(stdout.String())
+
+	pr := project{
 		name:   name,
 		commit: commit,
 		path:   folderPath,
-	}, nil
+	}
+	ch <- pr
 }
 
 func extractProjectName(folderPath string) string {
@@ -43,8 +57,8 @@ func extractProjectName(folderPath string) string {
 	return n
 }
 
-func separateCommits(output []byte) []string {
-	c := strings.Split(string(output), "\n")
+func separateCommits(output string) []string {
+	c := strings.Split(output, "\n")
 	return c
 }
 
