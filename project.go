@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -59,7 +60,15 @@ func scanGitDir(folderPath string) ([]string, error) {
 			return filepath.SkipDir
 		}
 		if d.IsDir() && d.Name() == ".git" {
-			folders = append(folders, strings.TrimSuffix(path, "/.git"))
+			basePath, err := os.Getwd()
+			if err != nil {
+				fmt.Fprintf(os.Stdout, "Error: %v", err)
+			}
+			if folderPath == "." {
+				folders = append(folders, basePath+strings.TrimSuffix(path, ".git"))
+			} else {
+				folders = append(folders, strings.TrimSuffix(path, ".git"))
+			}
 		}
 		return nil
 	})

@@ -148,6 +148,7 @@ func main() {
 				fmt.Println("input error: ", err)
 				continue
 			}
+			s, err = expandTilde(s)
 			if input == "q" {
 				return
 			}
